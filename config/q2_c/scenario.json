@@ -814,6 +814,7 @@
         0.1
       ],
       "detectionRange": 7,
+      "better_detectionRange": 20,
       "measurementPeriod": 1
     }
   }
