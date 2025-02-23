@@ -54,12 +54,14 @@ classdef LandmarkRangeBearingEdge < g2o.core.BaseBinaryEdge
         
         function initialEstimate(obj)
             % INITIALESTIMATE Compute the initial estimate of the landmark.
-            % 使用车辆位姿和测量数据来估计地标初始位置
-            pose = obj.edgeVertices{1}.x; % 车辆位姿 [x; y; theta]
-            meas = obj.measurement;       % 测量数据 [range; bearing]
+            %
+            % Estimate the initial position of the landmark using the vehicle pose 
+            % and measurement data.
+            pose = obj.edgeVertices{1}.x;  % Vehicle pose [x; y; theta]
+            meas = obj.measurement;        % Measurement data [range; bearing]
             r = meas(1);
             beta = meas(2);
-            % 根据车辆位姿和测量更新地标位置估计
+            % Update the landmark position estimate based on the vehicle pose and measurement
             lx = pose(1) + r * cos(pose(3) + beta);
             ly = pose(2) + r * sin(pose(3) + beta);
             obj.edgeVertices{2}.setEstimate([lx; ly]);
@@ -67,43 +69,46 @@ classdef LandmarkRangeBearingEdge < g2o.core.BaseBinaryEdge
         
         function computeError(obj)
             % COMPUTEERROR Compute the error for the edge.
-            % 计算预测测量与实际测量之间的误差，注意归一化角度误差
-            pose = obj.edgeVertices{1}.x;      % 车辆位姿 [x; y; theta]
-            landmark = obj.edgeVertices{2}.x;  % 地标位置 [l_x; l_y]
+            % Compute the error between the predicted measurement and the actual measurement.
+            % The angular error is normalized.
+            pose = obj.edgeVertices{1}.x;      % Vehicle pose [x; y; theta]
+            landmark = obj.edgeVertices{2}.x;  % Landmark position [l_x; l_y]
             dx = landmark(1) - pose(1);
             dy = landmark(2) - pose(2);
             r_pred = sqrt(dx^2 + dy^2);
             bearing_pred = atan2(dy, dx) - pose(3);
-            % 归一化角度至 [-pi, pi]
+             % Normalize the angle to the range [-pi, pi]
             bearing_pred = atan2(sin(bearing_pred), cos(bearing_pred));
             h = [r_pred; bearing_pred];
-            % 误差 = 测量值 - 预测值, 同时归一化角度误差
+            % Compute the error: measurement - predicted measurement
+            % Also normalize the angular error
             error = obj.measurement - h;
             error(2) = atan2(sin(error(2)), cos(error(2)));
             obj.errorZ = error;
         end
         
         function linearizeOplus(obj)
-            % linearizeOplus Compute the Jacobian of the error in the edge.
-            % 计算误差函数对车辆状态和地标状态的雅可比矩阵
-            pose = obj.edgeVertices{1}.x;      % 车辆位姿 [x; y; theta]
-            landmark = obj.edgeVertices{2}.x;  % 地标位置 [l_x; l_y]
+            % LINEARIZEOPLUS Compute the Jacobian of the error in the edge.
+            % Compute the Jacobian matrix of the error function with respect to 
+            % the vehicle state and the landmark state.
+            pose = obj.edgeVertices{1}.x;      % Vehicle pose [x; y; theta]
+            landmark = obj.edgeVertices{2}.x;  % Landmark position [l_x; l_y]
             dx = landmark(1) - pose(1);
             dy = landmark(2) - pose(2);
             q = dx^2 + dy^2;
             r = sqrt(q);
             
-            % 防止除零，若 q 接近 0 则设定最小值
+            % Prevent division by zero: if q is close to 0, set a minimum value
             if q < 1e-6
                 q = 1e-6;
                 r = sqrt(q);
             end
             
-            % 对车辆状态 (vertex 1) 的雅可比 (注意负号)
+            % Jacobian with respect to the vehicle state (vertex 1) (note the negative sign)
             J1 = [ dx/r,    dy/r,    0;
                   -dy/q,   dx/q,    1 ];
               
-            % 对地标状态 (vertex 2) 的雅可比 (注意负号)
+            % Jacobian with respect to the landmark state (vertex 2) (note the negative sign)
             J2 = [ -dx/r,  -dy/r;
                     dy/q,   -dx/q ];
             
